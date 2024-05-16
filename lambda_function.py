@@ -95,7 +95,33 @@ def Scannedpage_tobyte(doc_content: bytes, page_number: int) -> bytes:
         print(error_message)
 
         return b''  # Return an empty bytes object if an error occurs
+#  Convert the extracted date to DD/MM/YYYY format - Done!
+def to_YYMMDD(input_date: str)-> str:
+    
+    # Convert string to datetime object
+    date_object = datetime.strptime(input_date, "%d/%m/%Y")
+    # Format the datetime object as ymd (year-month-day without separators)
+    output_format = date_object.strftime("%y%m%d")
 
+    return output_format
+
+# Function to convert string to float based on condition in review
+def to_float(amount_str: str) -> float:
+    # Remove dollar sign if present
+    amount_str = amount_str.replace('$', '')
+    # Remove commas and spaces
+    amount_str = amount_str.replace(',', '').replace(' ', '')
+    try:
+        # Convert the string to a float
+        amount_float = float(amount_str)
+
+        # Log successful conversion
+        logging.info(f"Successfully converted '{amount_str}' to float: {amount_float}")
+        return amount_float
+    except ValueError:
+        # Log conversion failure
+        logging.error(f"Failed to convert '{amount_str}' to float")
+        raise
 
 # Transform Loaded PDF file into Image. Done!!
 def Convert_doc_to_images(pdf_content: bytes) -> list:
@@ -114,28 +140,124 @@ def Convert_doc_to_images(pdf_content: bytes) -> list:
             "Title": "Error converting PDF to images" ,
             "error": "{}".format(str(e))
         }
-############################### extraction Features Funtions #######################
-
-def extract_due_date(text: str)-> str:
-    return 0
 
 
+#   Restruct the function based on  return filter in review
+def filter_payblefrom(sentence: str)-> str:
+    word=sentence.split('\n')
+    if len(word)>1:
+        w=word[0].replace(' ','')
+        
+        if len(w)<=5 and len(word[1])>5:
+            result  = word[1]
+                   
+        else:
+            result  = word[0]
+    else:
+         result  = word[0]
+    return result
 
-def extract_total_amount(text: str)-> str:
-    return 0
 
 
+                            #########################################################
+                            #                                                       #
+                            #     Section D:  extraction Features Funtions R.F      #
+                            #                                                       #
+                            #########################################################
 
-def extract_payable_from(text: str)-> str:
+def extract_due_date(text: str) -> tuple:
+    try:
+        # Regular expression pattern to match dates
+        all_date_pattern = re.compile(r'\b(?:\d{1,2}[/]\d{1,2}[/]\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|may|june|july|august|september|october|november|december)\s\d{1,2},?\s?\d{2,4})\b', flags=re.IGNORECASE)
+        # Search for due date pattern in the text
+        due_date_match = re.search(r'\b(?:bill date|payment due date|total amount due|due date):?\s*(\d{1,2}[/]\d{1,2}[/]\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|may|june|july|august|september|october|november|december)\s\d{1,2},?\s?\d{2,4})\b', text.lower(), flags=re.IGNORECASE)
+        
 
-    return 0
+        if due_date_match:
+            # Extract the due date from the match
+            extracted_date = due_date_match.group(1)
+            logging.debug(f'This is the extracted Date: {extracted_date}')
+            
+            # Convert the extracted date to DD/MM/YYYY format
+            formatted_date = datetime.strptime(extracted_date, "%m/%d/%Y").strftime("%d/%m/%Y")
+            
+            # Convert the formatted date to YYMMDD format
+            formatted_date_convert = to_YYMMDD(formatted_date) if formatted_date else None
+            
+            return formatted_date, formatted_date_convert
+        
+        elif all_date_pattern:
+            # Find all matches in the text
+            date_match = all_date_pattern.findall(text.lower())
 
+            # Parse the found dates using dateutil.parser
+            parsed_dates = [parser.parse(match) for match in date_match]
 
+            # If a date is found, format it
+            if parsed_dates:
+                date = parsed_dates[0].strftime("%d/%m/%Y")
+                formatted_date = date
+                formatted_date_convert = to_YYMMDD(date) if date else None
+                return formatted_date, formatted_date_convert
+        else:
+            return None, None
 
+    except Exception as e:
+        logging.error(f"Error extracting  due date: {str(e)}")
+        return None, None
+
+def extract_total_amount(text: str) -> Union[float, None]:
+    try:
+        # Regular expression patterns
+        single_total_amount_pattern = r"balance due\s*?\$([\d,]+.\d{2})|total amount due\s+\d{2}/\d{2}/\d{4}\s+\$([\d.]+)|total payment due\n?.*?\n?([\d,]+\.\d+)|total due\s*\$([\d.]+)|amount due\s*([\d,.]+)|auto pay:?\s*\$([\d,.]+)|total amount due\s*.*?\n.*?\n\s*\$([\d.]+)|invoice amount\s*?\$([\d,]+.\d{2})"
+        all_amount_pattern = re.compile(r'\$(\s*[0-9,]+(?:\.[0-9]{2})?)')
+
+        # Search for all amounts in the text
+        all_amount_match = all_amount_pattern.search(text.lower())
+        
+        # Search for only the total amount in the text
+        match = re.search(single_total_amount_pattern, text.lower(), re.DOTALL)
+
+        # Check if a match is found
+        if match:
+            balance_due = next((x for x in match.groups() if x is not None), None)
+            logging.info(f'The balance due exists and it is: {balance_due}')
+            return to_float(balance_due)
+
+        elif all_amount_match:
+            
+            return to_float(all_amount_match.group(1))
+
+        else:
+            return None
+
+    except Exception as e:
+        logging.error(f"Error detecting total amount: {str(e)}")
+        return None
+
+def extract_payable_from(text: str)-> Union[str,None]:
+    
+    customer_name_match1 = re.search(r'billed to:?\n?(.*)|from:\n?(.*)|bill to:?\n?(.*)|site name:?\n?(.*)|(.*)\npo box 853|(.+?)\n(.+?)\n(.+?)p\.o\. box 853|((?:.*\n){3})(po|p.o|p.o.)\s*(box|box) 853|client name:?\s*(.*)',text.lower())
+
+    if customer_name_match1 is not None :
+        x=next((x for x in customer_name_match1.groups() if x is not None), "default") 
+    
+        payablefrom = ' '.join(re.findall(r'\b[A-Z][A-Z\s]+\b', x))
+        if len(payablefrom)>3:
+            c=  payablefrom
+        else:
+            c=  x
+        return  filter_payblefrom(c)
+                            
+    else:
+        return None
+
+# we haven't implemented yet -------- need deep learning and O
 def extract_payable_to(text: str)-> str:
-
-    return 0
-
+   
+   
+    pass
+    return 
 
 
 # extraction features information
@@ -169,12 +291,9 @@ def extraction_totalamount_duedate_payableto_payablefrom(
 
 
 
-
-
-
                             #########################################################
                             #                                                       #
-                            #       Section D: Main Feature Extraction functions    #
+                            #       Section E: Main Feature Extraction functions    #
                             #                                                       #
                             #########################################################
 
@@ -193,23 +312,24 @@ def Download_doc(s3_client,Bucket_name,s3_key) -> bytes:
     return 0
 
 
-def Upload_doc()-> None:
+def Upload_doc(np_array: list, bucket_name: str, prefix_splited_doc: str, doc_name: str, temp_pdf_name: str)-> None:
 
     try:
         # put Process logic here
+        pass
 
     except Exception as e:
         logger.error(f"Error Upload Document to S3 Bucket: {str(e)}")
 
 
 # Process document
-def Process_doc()-> None:
+def Process_doc(bucket_name,prefix_splited_doc: str,doc,all_csv_data: list,prefix_sheet_creator: str,header_written:bool)-> None:
 
 
     try:
 
-        
-    except Exception e:
+        pass
+    except Exception as e:
 
         logger.error(f"Error process Document : {str(e)}")
 
@@ -231,10 +351,9 @@ def sheet_creator(
 
 
     try:
-
-
+        pass
     
-    except Exception e:
+    except Exception as e:
         
         # Handle any exceptions that may occur during the process and print an error message
         logging.error(f"Error creating Sheet file and uploading to S3: {str(e)}")
@@ -244,12 +363,30 @@ def sheet_creator(
 
                             #########################################################
                             #                                                       #
-                            #         Section E: main handler funtion               #
+                            #         Section F: main handler funtion               #
                             #                                                       #
                             #########################################################
 
-def lambda_handler():
 
+def lambda_handler(event,context):
+
+    try: 
+        for record in event['Records']:
+            # Retrieve bucket name and object key
+            bucket_name = record['s3']['bucket']['name']
+            doc_key = record['s3']['object']['key']
+        
+            # Called function 'Load_document' to load document from s3.
+            doc_content = Download_doc(bucket_name,s3_client, doc_key)
+                
+            # Check if the object is a PDF file
+            if doc_key.lower().endswith('.pdf'):
+                
+                pass
+             
+    except Exception as e:
+        
+        logging.error(f"Error handling event: {str(e)}")
     
     return {
         'statusCode':200,
