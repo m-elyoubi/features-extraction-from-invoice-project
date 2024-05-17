@@ -259,7 +259,6 @@ def extract_payable_to(text: str)-> str:
     pass
     return 
 
-
 # extraction features information
 def extraction_totalamount_duedate_payableto_payablefrom(
     content_image: bytes
@@ -312,15 +311,6 @@ def Download_doc(s3_client,Bucket_name,s3_key) -> bytes:
     return 0
 
 
-def Upload_doc(np_array: list, bucket_name: str, prefix_splited_doc: str, doc_name: str, temp_pdf_name: str)-> None:
-
-    try:
-        # put Process logic here
-        pass
-
-    except Exception as e:
-        logger.error(f"Error Upload Document to S3 Bucket: {str(e)}")
-
 
 # Process document
 def Process_doc(bucket_name,prefix_splited_doc: str,doc,all_csv_data: list,prefix_sheet_creator: str,header_written:bool)-> None:
@@ -335,7 +325,19 @@ def Process_doc(bucket_name,prefix_splited_doc: str,doc,all_csv_data: list,prefi
 
 
 
-def sheet_creator(
+def Upload_doc(np_array: list, bucket_name: str, prefix_splited_doc: str, doc_name: str, temp_pdf_name: str)-> None:
+
+    try:
+        # put Process logic here
+        pass
+
+    except Exception as e:
+        logger.error(f"Error Upload Document to S3 Bucket: {str(e)}")
+
+
+
+
+def excel_creator(
     s3_client: BaseClient,
     bucket_name: str,
     prefix_splited_doc: str,
@@ -356,10 +358,8 @@ def sheet_creator(
     except Exception as e:
         
         # Handle any exceptions that may occur during the process and print an error message
-        logging.error(f"Error creating Sheet file and uploading to S3: {str(e)}")
+        logging.error(f"Error creating excel file and uploading to S3: {str(e)}")
         return None
-
-
 
                             #########################################################
                             #                                                       #
