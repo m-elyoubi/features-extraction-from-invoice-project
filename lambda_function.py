@@ -22,6 +22,11 @@ import locale
 from datetime import datetime
 from dateutil import parser
 
+#Additionnaly lib for sheet_creator function
+import openpyxl
+from openpyxl import Workbook
+from io import BytesIO
+
 
                             #########################################################
                             #                                                       #
@@ -334,32 +339,113 @@ def Upload_doc(np_array: list, bucket_name: str, prefix_splited_doc: str, doc_na
     except Exception as e:
         logger.error(f"Error Upload Document to S3 Bucket: {str(e)}")
 
+#############################################NEW CODE##################################
+# Refactored function
+def upload_doc(
+    s3_client: BaseClient,
+    np_array: list,
+    bucket_name: str,
+    prefix_splited_doc: str,
+    doc_name: str,
+    temp_pdf_name: str
+) -> None:
+
+    try:
+        # Create temporary image paths and save images
+        temp_image_paths = [
+            f"/tmp/image_{i}.jpg"
+            for i, np_img in enumerate(np_array)
+        ]
+
+        for path, np_img in zip(temp_image_paths, np_array):
+            # Convert NumPy array to BGR format
+            cv_img = cv.cvtColor(np_img, cv.COLOR_RGB2BGR)
+
+            # Encode image as JPEG
+            _, img_bytes = cv.imencode('.jpg', cv_img)
+
+            # Save JPEG to temporary path
+            with open(path, 'wb') as img_file:
+                img_file.write(img_bytes)
+
+        # Generate PDF from images
+        save_images_to_pdf(temp_image_paths, temp_pdf_name)
+
+        # Define S3 key for the PDF
+        s3_key = f"{prefix_splited_doc}/{doc_name}"
+
+        # Upload PDF to S3
+        with open(temp_pdf_name, 'rb') as pdf_file:
+            s3_client.upload_fileobj(pdf_file, bucket_name, s3_key)
+
+        logging.info(f"Successfully uploaded PDF to S3: s3://{bucket_name}/{s3_key}")
+
+    except Exception as e:
+        logging.error(f"Failed to save images to PDF and upload to S3: {str(e)}")
 
 
+#############################################NEW CODE excel_creator ##################################
 
 def excel_creator(
     s3_client: BaseClient,
     bucket_name: str,
     prefix_splited_doc: str,
     splited_doc_name: str,
-    all_csv_data: list,
+    all_data: list,
     header_written: bool,
     prefix_sheet_creator: str,
     due_date: str,
     total_amount: float,
-    paybale_from: str,
-    paybale_to: str
+    payable_from: str,
+    payable_to: str
 ) -> None:
-
-
     try:
-        pass
-    
-    except Exception as e:
+        # Initialize a dictionary to store extracted features information
+        extracted_info = {
+            "Payable From": payable_from,
+            "Due Date": due_date,
+            "Total Amount": total_amount,
+            "Payable To": payable_to,
+            "Link to PDF": generate_presigned_url(s3_client, bucket_name, f"{prefix_splited_doc}/{splited_doc_name}") # generate_presigned_url function not generate yet
+        }
+
+        # Convert extracted information to a list for the Excel
+        excel_data = list(extracted_info.values())
         
+        if not header_written:
+            # Write header only if it hasn't been written before
+            header = list(extracted_info.keys())
+            all_data.append(header)
+            header_written = True
+
+        # Append the current row of data to the overall Excel data
+        all_data.append(excel_data)
+
+        # Create a workbook and add the data to the sheet
+        wb = Workbook()
+        ws = wb.active
+
+        for row in all_data:
+            ws.append(row)
+
+        # Save data to a BytesIO buffer
+        excel_buffer = BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+
+        # Upload the Excel file to the specified S3 bucket
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=prefix_sheet_creator,
+            Body=excel_buffer.getvalue(),
+            ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    except Exception as e:
         # Handle any exceptions that may occur during the process and print an error message
-        logging.error(f"Error creating excel file and uploading to S3: {str(e)}")
+        logging.error(f"Error creating Excel file and uploading to S3: {str(e)}")
         return None
+
 
                             #########################################################
                             #                                                       #
