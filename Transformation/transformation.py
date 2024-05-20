@@ -1,4 +1,4 @@
-from utilities import convert_page_to_image_content
+from utilities import Scannedpage_tobyte
 import fitz
 from typing import List, Union
 
@@ -10,7 +10,7 @@ def transformation_document(pdf_content: bytes) -> Union[List[bytes], dict]:
         list_images = []  # Initialize an empty list to store the images
         pdf_document = fitz.open(stream=pdf_content, filetype="pdf")  # Open the PDF document from the byte content
         for i in range(1, len(pdf_document) + 1):  # Iterate through each page in the PDF
-            image_content = convert_page_to_image_content(pdf_content, i)  # Convert the current page to an image
+            image_content = Scannedpage_tobyte(pdf_content, i)  # Convert the current page to an image
             list_images.append(image_content)  # Append the image content to the list
         return list_images  # Return the list of images
     except Exception as e:

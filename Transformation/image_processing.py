@@ -3,13 +3,14 @@ from botocore.client import BaseClient
 import cv2 as cv
 from Transformation.transformation import transformation_document
 from Lake.upload_doc import upload_document
+from Extract.extraction import extraction_features
 from utilities import sheet_creator,append_due_date_and_amount, name_document_with_convention_naming,find_first_non_none
 import numpy as np
 import logging as logger
 
 
 # split document based on extracted features in review!
-def split_document(s3_client: BaseClient,textract_client: BaseClient,bucket_name,prefix_splited_doc: str,doc,all_csv_data: list,prefix_sheet_creator: str,header_written:bool) -> None: 
+def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,prefix_splited_doc: str,doc,all_csv_data: list,prefix_sheet_creator: str,header_written:bool) -> None: 
    
     # Initialize variables for reference information
     reference_due_date = None
@@ -18,8 +19,6 @@ def split_document(s3_client: BaseClient,textract_client: BaseClient,bucket_name
     reference_payabale_from = None
     doc_name = None
     
-
-
     similar_pages = []
     pdf_index = 1
     temp_pdf_name = None
@@ -39,9 +38,9 @@ def split_document(s3_client: BaseClient,textract_client: BaseClient,bucket_name
             img_np = cv.imdecode(np.fromstring(content_image, np.uint8), cv.IMREAD_COLOR)
             
 
-            temp_pdf_name = f"/tmp/pdf_{pdf_index}.pdf" #current_payabale_to
+            temp_pdf_name = f"/tmp/pdf_{pdf_index}.pdf" #current_payabale_to     
            
-            _,current_due_date_converted, current_total_amount,current_paybale_from, current_paybale_to  = extraction_totalamount_duedate_sender_Receiver(textract_client,content_image)  # thi will give us the four wanted features from each image
+            _,current_due_date_converted, current_total_amount,current_paybale_from, current_paybale_to  = extraction_features(textract_client,content_image)  # thi will give us the four wanted features from each image
            
             if reference_total_amount is not None or reference_due_date is not None:
               

@@ -12,6 +12,7 @@ import io
 from botocore.client import BaseClient
 from typing import Union
 import logging as log
+import pandas as pd
 
 log.basicConfig(level=log.DEBUG)
 logger = log.getLogger('Log')
@@ -19,7 +20,7 @@ logger = log.getLogger('Log')
 # Generic Functions
 
 # The pre-signed URL grants temporary access to download the specified splited document from the S3 bucket. in review
-def generate_presigned_url(bucket_name: str, object_key: str, expiration=3600)-> Union[str,None]:
+def create_preauthenticated_url(bucket_name: str, object_key: str, expiration=3600)-> Union[str,None]:
     
     try:
         # Initialize an S3 client
@@ -76,47 +77,42 @@ def format_currency(amount: Union[float, int]) -> str:
 # logging.info(f'format_currency:{format_currency(347857.9)}') tested done!
 
 # Converts a date string in the format 'YYYY-MM-DD' to 'YYMMDD' format - Done!
-def convert_date(input_date: str)-> str:
-    
+def to_YYMMDD(input_date: str)-> str:
+     
     # Convert string to datetime object
     date_object = datetime.strptime(input_date, "%Y-%m-%d")
 
     # Format the datetime object as ymd (year-month-day without separators)
     output_format = date_object.strftime("%y%m%d")
     return output_format
-# logging.info(f'convert_date:{convert_date("2024-04-30")}') #tested done!
+# logging.info(f'to_YYMMDD:{to_YYMMDD("2024-04-30")}') #tested done!
 
 # Function to convert string to float based on condition - 
 #   Todo: Manage all position of dollar symbole in the following scenario : ex : $ 6,66 , 56,66.00$  in review!
-def convert_to_float(amount_str: str) -> float:
-    
+# Function to convert string to float based on condition in review
+def to_float(amount_str: str) -> float:
+    # Remove dollar sign if present
+    amount_str = amount_str.replace('$', '')
+    # Remove commas and spaces
+    amount_str = amount_str.replace(',', '').replace(' ', '')
     try:
-        amount_str = amount_str.replace(' ', '')
-        # Remove dollar sign if present
-        if amount_str.startswith('$'):
-            amount_str = amount_str[1:]
-        if amount_str.endswith('$'):
-            amount_str = amount_str[:-1]
-
-        # Remove commas and spaces
-        amount_str = amount_str.replace(',', '')
-
         # Convert the string to a float
         amount_float = float(amount_str)
 
         # Log successful conversion
         log.info(f"Successfully converted '{amount_str}' to float: {amount_float}")
         return amount_float
+    except ValueError:
+        # Log conversion failure
+        log.error(f"Failed to convert '{amount_str}' to float")
+        raise
 
-    except ValueError as e:
-        # Handle the case where the conversion fails due to invalid input
-        log.error(f"Error converting '{amount_str}' to float: {e}")
-        return None
-# logging.info(f'convert_to_float:{convert_to_float("$ 6,66")}') #tested done!
+
+# logging.info(f'to_float:{to_float("$ 6,66")}') #tested done!
 
 
 #Save a list of images into a single PDF file  in review !
-def images_to_pdf(image_paths :list, output_pdf_path : str):
+def save_images_to_pdf(image_paths :list, output_pdf_path : str):
     
     try:
         # Initialize an instance of the FPDF class
@@ -137,22 +133,11 @@ def images_to_pdf(image_paths :list, output_pdf_path : str):
         # Handle any exceptions that may occur during the process and print an error message
         return (f"Error saving images to PDF: {str(e)}")
 
-#   Restruct the function based on  return filter in review
-def correct_customer_name(sentence: str) -> str:
-    word = sentence.split('\n')
-    if len(word) > 1:
-        w = word[0].replace(' ', '')
-        if len(w) <= 5 and len(word[1]) > 5:
-            return word[1]
-        else:
-            return word[0]
-    else:
-        return word[0]
 
 # Feature Extraction Functions
 
 #   Fct 1: Sub function to get due_date feature  - Done! 
-def detect_due_date(text: str) -> tuple:
+def extract_due_date(text: str) -> tuple:
     
     try:
         formatted_date = None
@@ -166,13 +151,13 @@ def detect_due_date(text: str) -> tuple:
         if due_date_match:
             # Extract the due date from the match
             extracted_date = due_date_match.group(1)
-            logging.debug(f'This is the extracted Date: {extracted_date}')
+            log.debug(f'This is the extracted Date: {extracted_date}')
             
             # Convert the extracted date to YYYY-MM-DD format
             formatted_date = datetime.strptime(extracted_date, "%m/%d/%Y").strftime("%Y-%m-%d")
             
             # Convert the formatted date to YYMMDD format
-            formatted_date_convert = convert_date(formatted_date) if formatted_date else None
+            formatted_date_convert = to_YYMMDD(formatted_date) if formatted_date else None
             
             return formatted_date, formatted_date_convert
         
@@ -187,7 +172,7 @@ def detect_due_date(text: str) -> tuple:
             if parsed_dates:
                 date = parsed_dates[0].strftime("%Y-%m-%d")
                 formatted_date = date
-                formatted_date_convert = convert_date(date) if date else None
+                formatted_date_convert = to_YYMMDD(date) if date else None
                 return (formatted_date, formatted_date_convert)
         else:
             return (None, None)
@@ -198,7 +183,7 @@ def detect_due_date(text: str) -> tuple:
 
 
 #   Fct 2: Sub function to get totale amount  - Done! 
-def detect_total_amount(text: str)-> Union[float,None]:
+def extract_total_amount(text: str)-> Union[float,None]:
         
     singaltotal_amount_pattern = r"balance due\s*?\$([\d,]+.\d{2})|total amount due\s+\d{2}/\d{2}/\d{4}\s+\$([\d.]+)|total payment due\n?.*?\n?([\d,]+\.\d+)|total due\s*\$([\d.]+)|amount due\s*([\d,.]+)|auto pay:?\s*\$([\d,.]+)|total amount due\s*.*?\n.*?\n\s*\$([\d.]+)|invoice amount\s*?\$([\d,]+.\d{2})"
     all_amount_pattern = re.compile(r'\$(\s*[0-9,]+(?:\.[0-9]{2})?)')
@@ -212,23 +197,49 @@ def detect_total_amount(text: str)-> Union[float,None]:
     if match:
         balance_due = next((x for x in match.groups() if x is not None), None) if match else None
         log.info(f'The balence due exsit and it is : {balance_due}')
-        return convert_to_float(balance_due)
+        return to_float(balance_due)
 
     elif all_amount_match:
        extracted_amount = all_amount_match.group(1)
-       return  convert_to_float(extracted_amount)
+       return  to_float(extracted_amount)
     
     else:
         return None
 #   Fct 3: Sub function to get paybale to feature in progress
-def detect_payable_to(text: str)-> Union[str,None]: 
-    return 0
+def filter_payblefrom(sentence: str) -> str:
+    # Split the sentence by whitespace
+    words = sentence.split()
+    # Initialize an empty list to hold the parts of the name
+    name_parts = []
+    
+    # Loop through the words to find the part that is a number (indicating the start of the address)
+    for word in words:
+        if word.isdigit() or word.endswith(',') or re.match(r'\d', word):
+            break
+        name_parts.append(word)
+    
+    # Join the name parts to form the full name
+    full_name = ' '.join(name_parts)
+    return full_name
 
+def extrcat_payable_from(text: str) -> Union[str, None]:
+    # Define a regular expression to find the name and address line
+    customer_name_match = re.search(r'bill to:?\s*(.*)', text.lower(), re.IGNORECASE)
+    
+    if customer_name_match is not None:
+        # Get the matched group
+        x = customer_name_match.group(1).strip()
+        
+        log.info(f"Customer Name Line: {x}")
+        return filter_payblefrom(x)
+    else:
+        log.info("Company name not found.")
+        return None
 #   Fct 4: Sub function to get paybale feature in review! Try to cover all scenarios (\t, \n, ...)
 
-def detect_payable_from(text: str)-> Union[str,None]:
+def extrcat_payable_from(text: str)-> Union[str,None]:
     
-    customer_name_match1 = re.search(r'billed to:?\n?(.*)|from:\n?(.*)|bill to:?\n?(.*)|site name:?\n?(.*)|(.*)\npo box 853|(.+?)\n(.+?)\n(.+?)p\.o\. box 853|((?:.*\n){3})(po|p.o|p.o.)\s*(box|box) 853|client name:?\s*(.*)',text.lower())
+    customer_name_match1 = re.search(r'billed to:?\n?(.*)|from:\n?(.*)|bill to:?\n?(.*)|site name:?\n?(.*)|(.*)\npo box 853|(.+?)\n(.+?)\n(.+?)p\.o\. box 853|((?:.*\n){3})(po|p.o|p.o.)\s*(box|box) 853|client name:?\s*(.*)|receiver:\s*([^@]+)@',text.lower())
 
     if customer_name_match1 is not None :
         x=next((x for x in customer_name_match1.groups() if x is not None), "default") 
@@ -240,13 +251,26 @@ def detect_payable_from(text: str)-> Union[str,None]:
             c=  customer_name
         else:
             c=  x
-        return  correct_customer_name(c)
+        return  filter_payblefrom(c)
                             
     else:
         return None
 
+#   Fct 5: Sub function to get paybale feature in review! Try to cover all scenarios (\t, \n, ...)
+def extract_InvoiceNumber(text:str )->Union[str,None]:   
+    # Define a regular expression pattern to match the invoice number
+    pattern = r"invoice number:\s*(\w+)"
+    # Use re.search to find the pattern in the text
+    match = re.search(pattern, text.lower())
+    
+    # Extract the invoice number if found
+    if match:
+        invoice_number = match.group(1)
+        log.inf(f"Invoice Number: {invoice_number}")
+    else:
+        log.inf("Invoice Number not found")
 
-#   Fct 5: name file based on whatever detected features in {Feat.2} {$Feat.1} {Feat.3} {Feat.4 }.pdf format in review
+#   Fct 6: name file based on whatever detected features in {Feat.2} {$Feat.1} {Feat.3} {Feat.4 }.pdf format in review
 def name_document_with_convention_naming(due_date: str, total_amount: float) -> Union[str, None]:
     
     try:
@@ -298,17 +322,14 @@ def find_first_non_none(dic):
             break
     return selected_due_date, selected_total_amount
 
-
-
-
 # Create a CSV file containing extracted features and upload it to an S3 bucket.  in review!
 
-def sheet_creator(
-    s3_client: BaseClient,
+def excel_creator(
+    s3_client:BaseClient,
     bucket_name: str,
     prefix_splited_doc: str,
     splited_doc_name: str,
-    all_csv_data: list,
+    all_excel_data: list,
     header_written: bool,
     prefix_sheet_creator: str,
     due_date: str,
@@ -316,10 +337,6 @@ def sheet_creator(
     paybale_from: str,
     paybale_to: str
 ) -> None:
-   
-    # This function is for saving features inside a CSV file.
-    # Todo: the stored features should be a list of extracted features in function extraction_()
-    # Todo: Upload the excel file in the S3 bucket.
     try:
         # Initialize a dictionary to store extracted features information
         extracted_info = {}
@@ -329,39 +346,42 @@ def sheet_creator(
         extracted_info["Total Amount"] = total_amount
         extracted_info["Payable To"]   = paybale_to
 
-        # extracted_info["Link to PDF"] = f'https://{bucket_name}.s3.amazonaws.com/{prefix_splited_doc}/{splited_doc_name}'
-        extracted_info["Link to PDF"] = generate_presigned_url(s3_client,bucket_name, f"{prefix_splited_doc}/{splited_doc_name}")
-        # Convert extracted information to a list for the CSV
-        csv_data = list(extracted_info.values())
+        extracted_info["Link to PDF"] = create_preauthenticated_url(s3_client, bucket_name, f"{prefix_splited_doc}/{splited_doc_name}")
+        
+        # Convert extracted information to a DataFrame
+        excel_row_data = pd.DataFrame([extracted_info])
         
         if not header_written:
             # Write header only if it hasn't been written before
             header = list(extracted_info.keys())
-            all_csv_data.append(header)
+            all_excel_data.append(header)
             header_written = True
 
-        # Append the current row of data to the overall CSV data
-        all_csv_data.append(csv_data)
+        # Append the current row of data to the overall Excel data
+        all_excel_data.append(excel_row_data)
         
-        # Save data to a single CSV file
-        csv_buffer = io.StringIO()
-        csv_writer = csv.writer(csv_buffer)
-        csv_writer.writerows(all_csv_data)
-
-        # Upload the CSV file to the specified S3 bucket
+        # Concatenate all data into a single DataFrame
+        excel_data_df = pd.concat(all_excel_data, ignore_index=True)
+        
+        # Create an in-memory buffer to store the Excel file
+        excel_buffer = BytesIO()
+        
+        # Save the DataFrame to the Excel buffer
+        excel_data_df.to_excel(excel_buffer, index=False)
+        
+        # Upload the Excel file to the specified S3 bucket
         s3_client.put_object(
             Bucket=bucket_name,
             Key=prefix_sheet_creator,
-            Body=csv_buffer.getvalue()
+            Body=excel_buffer.getvalue()
         )
 
     except Exception as e:
         # Handle any exceptions that may occur during the process and print an error message
-        log.error(f"Error creating CSV file and uploading to S3: {str(e)}")
-        return None
+        log.error(f"Error creating Excel file and uploading to S3: {str(e)}")
 
 # Convert a specific page of a PDF document to image content.   Done!!
-def convert_page_to_image_content(doc_content: bytes, page_number: int) -> bytes:
+def Scannedpage_tobyte(doc_content: bytes, page_number: int) -> bytes:
     
     try:
         # Open the PDF file using PyMuPDF (fitz) library

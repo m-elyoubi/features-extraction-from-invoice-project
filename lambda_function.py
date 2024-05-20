@@ -2,7 +2,6 @@ import os
 import logging as logger
 import boto3
 from Lake.load_doc import load_document
-
 from Transformation.image_processing import process_doc
 
                             #########################################################
