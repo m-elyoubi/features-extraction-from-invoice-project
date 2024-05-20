@@ -8,7 +8,7 @@ COPY requirements.txt ./
 RUN pip3 install -r requirements.txt
 
 # Copy function code to container
-COPY lambda_funtion.py ./
+COPY lambda_function.py ./
 
 # setting the CMD to your handler file_name.function_name
-CMD [ "lambda_funtion.handler" ]
+CMD [ "lambda_function.handler" ]

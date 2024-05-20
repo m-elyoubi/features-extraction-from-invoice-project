@@ -8,54 +8,95 @@ import numpy as np
 import logging as logger
 
 
-
-def process_doc(s3_client: BaseClient, textract_client: BaseClient, bucket_name: str, prefix_splited_doc: str, doc: bytes, all_csv_data: list, prefix_sheet_creator: str, header_written: bool) -> None:
+# split document based on extracted features in review!
+def split_document(s3_client: BaseClient,textract_client: BaseClient,bucket_name,prefix_splited_doc: str,doc,all_csv_data: list,prefix_sheet_creator: str,header_written:bool) -> None: 
+   
+    # Initialize variables for reference information
     reference_due_date = None
     reference_total_amount = None
-    reference_payable_to = None
-    reference_payable_from = None
+    reference_payabale_to = None
+    reference_payabale_from = None
     doc_name = None
+    
+
+
     similar_pages = []
     pdf_index = 1
     temp_pdf_name = None
-    dic = {'due date': [], 'total amount': []}
+    
+
     try:
+        # Make inner compraison between images.
+            # Todo: Compare the similarity of images. 
+            # Todo: Convert Image to pdf document
         content_images_list = transformation_document(doc)
+        
+        # Create this dictionary to save the first due date and corresponding amount that they come at the top of the document
+        dic={'due date':[] ,'total amount':[]}
+        # Iterate over each image content in the array
         for i, content_image in enumerate(content_images_list, start=1):
-            img_np = cv.imdecode(np.frombuffer(content_image, np.uint8), cv.IMREAD_COLOR)
-            temp_pdf_name = f"/tmp/pdf_{pdf_index}.pdf"
-            _, current_due_date_converted, current_total_amount, current_payable_from, current_payable_to = extraction_totalamount_duedate_sender_receiver(textract_client, content_image)
+            # Decode image content and resize if necessary
+            img_np = cv.imdecode(np.fromstring(content_image, np.uint8), cv.IMREAD_COLOR)
+            
+
+            temp_pdf_name = f"/tmp/pdf_{pdf_index}.pdf" #current_payabale_to
+           
+            _,current_due_date_converted, current_total_amount,current_paybale_from, current_paybale_to  = extraction_totalamount_duedate_sender_Receiver(textract_client,content_image)  # thi will give us the four wanted features from each image
            
             if reference_total_amount is not None or reference_due_date is not None:
-                if (current_total_amount == reference_total_amount or current_due_date_converted == reference_due_date):
-                    append_due_date_and_amount(dic, reference_due_date, reference_total_amount)
+              
+
+                # Check if the page is similar to the previous one based on SSIM or extracted information
+                if (current_total_amount == reference_total_amount or current_due_date_converted==reference_due_date):
+                    #"Page {i} is similar to the previous page. Adding to the current sequence."
+                    append_due_date_and_amount(dic,reference_due_date,reference_total_amount)
                     similar_pages.append(img_np)
+        
                 else:
+                    # Pages are not similar, save the current sequence to a new PDF
                     if similar_pages:
-                        append_due_date_and_amount(dic, reference_due_date, reference_total_amount)
-                        selected_due_date, selected_total_amount = find_first_non_none(dic)
-                        doc_name = name_document_with_convention_naming(selected_due_date, selected_total_amount)
-                        upload_document(s3_client, similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
-                        sheet_creator(s3_client, bucket_name, prefix_splited_doc, doc_name, all_csv_data, header_written, prefix_sheet_creator, selected_due_date, selected_total_amount, reference_payable_from, reference_payable_to)                                  
-                        header_written = True
-                        dic['due date'] = []
-                        dic['total amount'] = []
+                        
+                        # add for each splited document with own due date and total amount
+                        append_due_date_and_amount(dic,reference_due_date,reference_total_amount)
+                       
+                        selected_due_date, selected_total_amount=find_first_non_none(dic)
+                        
+                        doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount)
+                        upload_document(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
+                
+                        sheet_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,reference_payabale_from, reference_payabale_to)                                  
+                        header_written=True
+                        
+
+
+                        dic['due date']=[]
+                        dic['total amount']=[]
+                    
                     pdf_index += 1
+                    # Start a new sequence with the current page
                     similar_pages = [img_np]
             else:
                 similar_pages.append(img_np)
 
-            reference_payable_to = current_payable_to
-            reference_due_date = current_due_date_converted
+            
+            reference_payabale_to = current_paybale_to
+            reference_due_date= current_due_date_converted
             reference_total_amount = current_total_amount
-            reference_payable_from = current_payable_from
+            reference_payabale_from = current_paybale_from
 
+
+            
+            
+
+        # Save the last sequence to a new PDF if not empty
         if similar_pages:
             temp_pdf_name = f"/tmp/pdf_{pdf_index}.pdf"
-            selected_due_date, selected_total_amount = find_first_non_none(dic)
-            doc_name = name_document_with_convention_naming(selected_due_date, selected_total_amount)
-            upload_document(s3_client, similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
-            sheet_creator(s3_client, bucket_name, prefix_splited_doc, doc_name, all_csv_data, header_written, prefix_sheet_creator, selected_due_date, selected_total_amount, reference_payable_from, reference_payable_to)
+            selected_due_date, selected_total_amount=find_first_non_none(dic)
+            doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount)
+            upload_document(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
+            sheet_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,reference_payabale_from,reference_payabale_to)
+            
+
     except Exception as e:
         logger.error(f"Error splitting document: {str(e)}")
     return None

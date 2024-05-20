@@ -4,6 +4,7 @@ import logging as log
 
 
 
+# Load pdf file from s3 bucket   In Done!
 def load_document(s3_bucket: str, s3_client: boto3.client, s3_key: str) -> Union[bytes, None]:
     try:
         response = s3_client.get_object(Bucket=s3_bucket, Key=s3_key)
