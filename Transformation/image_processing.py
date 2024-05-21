@@ -2,7 +2,7 @@
 from botocore.client import BaseClient
 import cv2 as cv
 from Transformation.transformation import transformation_document
-from Lake.upload_doc import upload_document
+from Lake.upload_doc import upload_doc  
 from Extract.extraction import extraction_features
 from utilities import sheet_creator,append_due_date_and_amount, name_document_with_convention_naming,find_first_non_none
 import numpy as np
@@ -61,7 +61,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
                         selected_due_date, selected_total_amount=find_first_non_none(dic)
                         
                         doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount)
-                        upload_document(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
+                        upload_doc(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
                 
                         sheet_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,reference_payabale_from, reference_payabale_to)                                  
                         header_written=True
@@ -75,7 +75,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
                     # Start a new sequence with the current page
                     similar_pages = [img_np]
             else:
-                similar_pages.append(img_np)
+                similar_pages.append(img_np)  
 
             
             reference_payabale_to = current_paybale_to
@@ -84,15 +84,12 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
             reference_payabale_from = current_paybale_from
 
 
-            
-            
-
         # Save the last sequence to a new PDF if not empty
         if similar_pages:
             temp_pdf_name = f"/tmp/pdf_{pdf_index}.pdf"
             selected_due_date, selected_total_amount=find_first_non_none(dic)
             doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount)
-            upload_document(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
+            upload_doc(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
             sheet_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,reference_payabale_from,reference_payabale_to)
             
 
