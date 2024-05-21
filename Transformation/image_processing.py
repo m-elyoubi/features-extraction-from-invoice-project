@@ -10,8 +10,10 @@ import logging as logger
 
 
 # split document based on extracted features in review!
-def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,prefix_splited_doc: str,doc,all_csv_data: list,prefix_sheet_creator: str,header_written:bool) -> None: 
+def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,prefix_splited_doc: str,doc,prefix_sheet_creator: str) -> None: 
    
+    all_csv_data = []       # Initialize an empty list to accumulate CSV data
+    header_written = False
     # Initialize variables for reference information
     reference_due_date = None
     reference_total_amount = None
@@ -32,7 +34,14 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
         content_images_list = transformation_document(doc)
         
         # Create this dictionary to save the first due date and corresponding amount that they come at the top of the document
-        dic={'due date':[] ,'total amount':[]}
+        dic={
+            'due date':[] ,
+            'total amount':[],
+            'payable from':[],
+            'payable to':[],
+            'invoice number':[],
+
+            }
         # Iterate over each image content in the array
         for i, content_image in enumerate(content_images_list, start=1):
             # Decode image content and resize if necessary

@@ -20,8 +20,7 @@ output_folder = os.environ.get('FOLDER_Sheet_OUTPUT')
 
 def handler(event,context): 
 
-    all_csv_data = []       # Initialize an empty list to accumulate CSV data
-    header_written = False
+    
     
     try: 
         for record in event['Records']:
@@ -38,9 +37,9 @@ def handler(event,context):
                 # prefix_splited_doc has the same name of the document.
                 prefix_splited_doc = "{}{}".format(splited_doc_folder,doc_name)
                 # sheet_creator has the same name of the document with format csv.
-                prefix_sheet_creator="{}{}".format(output_folder,f"{doc_name}.csv")
+                prefix_sheet_creator="{}{}".format(output_folder,f"{doc_name}.xlsx")
                 # Called function 'split_document' to split document based on extrected features
-                process_doc(s3_client,textract_client,bucket_name,prefix_splited_doc,doc_content,all_csv_data,prefix_sheet_creator,header_written)   
+                process_doc(s3_client,textract_client,bucket_name,prefix_splited_doc,doc_content,prefix_sheet_creator)   
                 
     except Exception as e:
         logger.error(f"Error handling event: {str(e)}")
