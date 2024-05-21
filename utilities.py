@@ -257,9 +257,9 @@ def extract_InvoiceNumber(text:str )->Union[str,None]:
     # Extract the invoice number if found
     if match:
         invoice_number = match.group(1)
-        log.inf(f"Invoice Number: {invoice_number}")
+        log.info(f"Invoice Number: {invoice_number}")
     else:
-        log.inf("Invoice Number not found")
+        log.info("Invoice Number not found")
 
 #   Fct 6: name file based on whatever detected features in {Feat.2} {$Feat.1} {Feat.3} {Feat.4 }.pdf format in review
 def name_document_with_convention_naming(due_date: str, total_amount: float, payable_from: str = None, payable_to: str = None, invoice_number: str = None) -> Union[str, None]:

@@ -18,16 +18,7 @@ splited_doc_folder = os.environ.get('FOLDER_SPLITED_DOC')
 output_folder = os.environ.get('FOLDER_Sheet_OUTPUT')
 
 
-def handler(event,context):
-    
-    #-----------------------    Define variables   --------------------- 
-    # Initialize AWS clients
-    s3_client = boto3.client('s3')  # S3 client
-    textract_client = boto3.client('textract')  # Textract client
-
-    splited_doc_folder = os.environ.get('SPLITED_DOC_FOLDER')
-    output_folder = os.environ.get('OUTPUT_FOLDER')
-  
+def handler(event,context): 
 
     all_csv_data = []       # Initialize an empty list to accumulate CSV data
     header_written = False
@@ -40,7 +31,7 @@ def handler(event,context):
         
             # Called function 'Load_document' to load document from s3.
             doc_content = load_document(bucket_name,s3_client, doc_key)
-            logger.inf(f"load doc: {doc_content}")
+            logger.info(f"load doc: {doc_content}")
             # Check if the object is a PDF file
             if doc_key.lower().endswith('.pdf'):
                 doc_name=os.path.basename(doc_key).replace(".pdf", "")
