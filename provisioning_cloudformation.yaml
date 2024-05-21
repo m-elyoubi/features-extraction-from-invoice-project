@@ -1,0 +1,129 @@
+Parameters:
+  KeyName:
+    Description: Name of existing EC2 Key Pair to enable SSH acess into the server
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+
+  # # Create the EC2 instance    Done!
+  # EC2Instance:          #Logical ID
+  #   Type: AWS::EC2::Instance
+  #   Properties:
+  #     ImageId: ami-04ff98ccbfa41c9ad
+  #     InstanceType: t2.micro
+  #     SecurityGroups:
+  #       - !Ref MySecurityGroup
+      
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Join
+  #           - ""
+  #           - - 'dev_feat_ext_from_doc_EC2_'
+  #             - !Ref AWS::Region    # this is pseudo parameter
+  #     KeyName: !Ref KeyName
+          
+
+  # # Create the Security Group
+  # MySecurityGroup:
+    
+  #   Type: 'AWS::EC2::SecurityGroup'
+  #   Properties:
+  #     GroupDescription: Enable SSH Access via port 22
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: '22'
+  #         ToPort: '22'
+  #         CidrIp: 0.0.0.0/0
+  # Create the Lambda funtion
+  Lambda: 
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: 'dev-feat-ext-from-doc-lambda'
+      Role: !GetAtt LambdaExecutionRole.Arn  # logicId.Arn
+      Runtime: python3.12
+      Handler: index.lambda_hundler
+
+      Code: 
+        ImageUri: '767398077056.dkr.ecr.us-east-1.amazonaws.com/test-ecr:latest'
+      PackageType: Image
+      
+      Tags:
+        - Key: Name
+          Value: lambda-feat
+    
+  # Create the S3 Bucket funtion
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: 'dev-feat-ext-from-doc-s3'
+      Tags: 
+        - Key: Name
+          Value: s3-bucket-fext
+    
+  # # Create the ECR funtion for lambda function
+  # ECR:
+  #   Type: AWS::ECR::Repository
+  #   Description: ECR to hold image of Lambda function
+  #   Properties:
+  #     ImageScanningConfiguration: 
+  #       ScanOnPush: true
+  #     RepositoryName: dev-feat-ext-from-doc-ecr
+  #     RepositoryPolicyText:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Sid: ECRLambdaPolicy
+  #           Effect: Allow
+  #           Principal:
+  #             Service:
+  #               - lambda.amazonaws.com
+  #           Action: 
+  #           - "ecr:GetDownloadUrlForLayer"
+  #           - "ecr:BatchGetImage"
+  #           - "ecr:BatchCheckLayerAvailability"
+  #           - "ecr:PutImage"
+  #           - "ecr:InitiateLayerUpload"
+  #           - "ecr:UploadLayerPart"
+  #           - "ecr:CompleteLayerUpload" 
+
+  #           Resource: 
+  #              - !Sub "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/dev-feat-ext-from-doc-ecr"
+  #     Tags:
+  #       - Key: Name
+  #         Value: ambda-ecr
+           
+  # Define IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 'dev-feat-ext-from-doc-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'dev-feat-ext-from-doc-role-Policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:ListBucket'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+
+
+
+
+
+# # define outputs
+# Outputs:
+#   ECRUri:
+#     Value: !GetAtt ECR.RepositoryURi
+  
