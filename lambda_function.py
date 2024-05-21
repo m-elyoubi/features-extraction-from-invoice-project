@@ -40,7 +40,7 @@ def handler(event,context):
         
             # Called function 'Load_document' to load document from s3.
             doc_content = load_document(bucket_name,s3_client, doc_key)
-                
+            logger.inf(f"load doc: {doc_content}")
             # Check if the object is a PDF file
             if doc_key.lower().endswith('.pdf'):
                 doc_name=os.path.basename(doc_key).replace(".pdf", "")

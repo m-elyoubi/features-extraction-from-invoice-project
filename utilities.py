@@ -181,7 +181,6 @@ def extract_due_date(text: str) -> tuple:
         log.error(f"Error detecting due date: {str(e)}")
         return (None, None)
 
-
 #   Fct 2: Sub function to get totale amount  - Done! 
 def extract_total_amount(text: str)-> Union[float,None]:
         
@@ -205,7 +204,7 @@ def extract_total_amount(text: str)-> Union[float,None]:
     
     else:
         return None
-#   Fct 3: Sub function to get paybale to feature in progress
+
 def filter_payblefrom(sentence: str) -> str:
     # Split the sentence by whitespace
     words = sentence.split()
@@ -222,41 +221,33 @@ def filter_payblefrom(sentence: str) -> str:
     full_name = ' '.join(name_parts)
     return full_name
 
-def extrcat_payable_from(text: str) -> Union[str, None]:
+#   Fct 3: Sub function to get paybale from feature  
+def extract_payable_from(text: str) -> Union[str, None]:
     # Define a regular expression to find the name and address line
-    customer_name_match = re.search(r'bill to:?\s*(.*)', text.lower(), re.IGNORECASE)
+    customer_name_match = re.search(r'billed to:?\n?(.*)|from:\n?(.*)|bill to:?\n?(.*)|site name:?\n?(.*)|(.*)\npo box 853|(.+?)\n(.+?)\n(.+?)p\.o\. box 853|((?:.*\n){3})(po|p.o|p.o.)\s*(box|box) 853|client name:?\s*(.*)|receiver:\s*([^@]+)@|bill to:?\s*(.*)', text.lower(), re.IGNORECASE)
     
     if customer_name_match is not None:
         # Get the matched group
-        x = customer_name_match.group(1).strip()
-        
-        log.info(f"Customer Name Line: {x}")
+        x =next((x for x in customer_name_match.groups() if x is not None),None) if customer_name_match else None
         return filter_payblefrom(x)
     else:
         log.info("Company name not found.")
         return None
 #   Fct 4: Sub function to get paybale feature in review! Try to cover all scenarios (\t, \n, ...)
-
-def extrcat_payable_from(text: str)-> Union[str,None]:
+def extract_payable_to(text: str) -> Union[str, None]:
+    # Define a regular expression to find the name and address line
+    customer_name_match = re.search(r'sender:\s*([^@]+)@|company:\s*(.*)\n', text.lower(), re.IGNORECASE)
     
-    customer_name_match1 = re.search(r'billed to:?\n?(.*)|from:\n?(.*)|bill to:?\n?(.*)|site name:?\n?(.*)|(.*)\npo box 853|(.+?)\n(.+?)\n(.+?)p\.o\. box 853|((?:.*\n){3})(po|p.o|p.o.)\s*(box|box) 853|client name:?\s*(.*)|receiver:\s*([^@]+)@',text.lower())
-
-    if customer_name_match1 is not None :
-        x=next((x for x in customer_name_match1.groups() if x is not None), "default") 
-        # if customer_name_match1 and customer_name_match1.group(1).strip()!= "":
-        # print(f'customer_name before:{x}')
-        customer_name = ' '.join(re.findall(r'\b[A-Z][A-Z\s]+\b', x))
-
-        if len(customer_name)>3:
-            c=  customer_name
-        else:
-            c=  x
-        return  filter_payblefrom(c)
-                            
+    if customer_name_match is not None:
+        # Get the matched group
+        x =next((x for x in customer_name_match.groups() if x is not None),None) if customer_name_match else None
+        log.info(f"Company name is {x}")
+        return x
     else:
+        log.info("Company name not found.")
         return None
-
-#   Fct 5: Sub function to get paybale feature in review! Try to cover all scenarios (\t, \n, ...)
+    
+#   Fct 5: Sub function to get invoice number feature in review! Try to cover all scenarios (\t, \n, ...)
 def extract_InvoiceNumber(text:str )->Union[str,None]:   
     # Define a regular expression pattern to match the invoice number
     pattern = r"invoice number:\s*(\w+)"
@@ -271,21 +262,19 @@ def extract_InvoiceNumber(text:str )->Union[str,None]:
         log.inf("Invoice Number not found")
 
 #   Fct 6: name file based on whatever detected features in {Feat.2} {$Feat.1} {Feat.3} {Feat.4 }.pdf format in review
-def name_document_with_convention_naming(due_date: str, total_amount: float) -> Union[str, None]:
-    
+def name_document_with_convention_naming(due_date: str, total_amount: float, payable_from: str = None, payable_to: str = None, invoice_number: str = None) -> Union[str, None]:
     try:
-        invoice_name = None  
+        invoice_name = None
 
-        # Check all possible cases
-        if due_date is not None  and total_amount is not None:
-            # Create a destination name with due_date, formatted total amount
-            invoice_name = f"{due_date} {format_currency(total_amount)}.pdf"
+        # Check all possible cases and construct the file name based on available features
+        if due_date is not None and total_amount is not None:
+            invoice_name = f"{due_date} {format_currency(total_amount)} {payable_from or 'Unknown'} {payable_to or 'Unknown'} {invoice_number or 'NoInvoice'}.pdf"
         elif due_date is None and total_amount is not None:
-            # Create a destination name with formatted total amount
-            invoice_name = f"{format_currency(total_amount)} .pdf"
+            invoice_name = f"{format_currency(total_amount)} {payable_from or 'Unknown'} {payable_to or 'Unknown'} {invoice_number or 'NoInvoice'}.pdf"
+        elif due_date is not None and total_amount is None:
+            invoice_name = f"{due_date} {payable_from or 'Unknown'} {payable_to or 'Unknown'} {invoice_number or 'NoInvoice'}.pdf"
         else:
-            # Create a destination name with due_date
-            invoice_name = f"{due_date} .pdf"
+            invoice_name = f"{payable_from or 'Unknown'} {payable_to or 'Unknown'} {invoice_number or 'NoInvoice'}.pdf"
 
         return invoice_name
     except Exception as e:
@@ -293,7 +282,7 @@ def name_document_with_convention_naming(due_date: str, total_amount: float) -> 
         return None
 
 # Document Splitting Functions
-def append_due_date_and_amount(dic, current_due_date_converted, current_total_amount):
+def append_features(dic, current_due_date_converted, current_total_amount, payable_from=None, payable_to=None, invoice_number=None):
     if current_due_date_converted is None and current_total_amount is None:
         dic['due date'].append('None')
         dic['total amount'].append('None')
@@ -307,23 +296,54 @@ def append_due_date_and_amount(dic, current_due_date_converted, current_total_am
     dic['due date'].append(current_due_date_converted)
     dic['total amount'].append(current_total_amount)
 
+    dic['payable from'].append(payable_from if payable_from is not None else 'None')
+    dic['payable to'].append(payable_to if payable_to is not None else 'None')
+    dic['invoice number'].append(invoice_number if invoice_number is not None else 'None')
+
     return dic
 
 def find_first_non_none(dic):
+    # Initialize variables to hold the first non-None values for each feature
     selected_due_date = None
     selected_total_amount = None
+    selected_payable_from = None
+    selected_payable_to = None
+    selected_invoice_number = None
     
-    for due_date, total_amount in zip(dic['due date'], dic['total amount']):
-        if due_date != 'None':
+    # Iterate over the lists in the dictionary simultaneously
+    for due_date, total_amount, payable_from, payable_to, invoice_number in zip(
+            dic['due date'], dic['total amount'], dic['payable from'], dic['payable to'], dic['invoice number']):
+        
+        # Check and assign the first non-None due date
+        if due_date != 'None' and selected_due_date is None:
             selected_due_date = due_date
-        if total_amount != 'None':
+            
+        # Check and assign the first non-None total amount
+        if total_amount != 'None' and selected_total_amount is None:
             selected_total_amount = total_amount
-        if selected_due_date is not None and selected_total_amount is not None:
+        
+        # Check and assign the first non-None payable from
+        if payable_from != 'None' and selected_payable_from is None:
+            selected_payable_from = payable_from
+        
+        # Check and assign the first non-None payable to
+        if payable_to != 'None' and selected_payable_to is None:
+            selected_payable_to = payable_to
+        
+        # Check and assign the first non-None invoice number
+        if invoice_number != 'None' and selected_invoice_number is None:
+            selected_invoice_number = invoice_number
+        
+        # If all first non-None values are found, exit the loop
+        if (selected_due_date is not None and selected_total_amount is not None and
+            selected_payable_from is not None and selected_payable_to is not None and
+            selected_invoice_number is not None):
             break
-    return selected_due_date, selected_total_amount
+            
+    # Return the first non-None values for all features
+    return selected_due_date, selected_total_amount, selected_payable_from, selected_payable_to, selected_invoice_number
 
 # Create a CSV file containing extracted features and upload it to an S3 bucket.  in review!
-
 def excel_creator(
     s3_client:BaseClient,
     bucket_name: str,
@@ -335,7 +355,8 @@ def excel_creator(
     due_date: str,
     total_amount: float,
     paybale_from: str,
-    paybale_to: str
+    paybale_to: str,
+    invoice_number: str
 ) -> None:
     try:
         # Initialize a dictionary to store extracted features information
@@ -345,6 +366,7 @@ def excel_creator(
         extracted_info["Due Date"]     = due_date
         extracted_info["Total Amount"] = total_amount
         extracted_info["Payable To"]   = paybale_to
+        extracted_info["Invoice Number"]   = invoice_number
 
         extracted_info["Link to PDF"] = create_preauthenticated_url(s3_client, bucket_name, f"{prefix_splited_doc}/{splited_doc_name}")
         
