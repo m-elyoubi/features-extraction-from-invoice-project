@@ -9,11 +9,11 @@ import numpy as np
 import logging as logger
 
 
-# split document based on extracted features in review!
-def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,prefix_splited_doc: str,doc,prefix_sheet_creator: str) -> None: 
+# split document based on extracted features 
+
+def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,prefix_splited_doc: str,doc,all_csv_data:list,prefix_sheet_creator: str,header_written:bool) -> None: 
    
-    all_csv_data = []       # Initialize an empty list to accumulate CSV data
-    header_written = False
+    
     # Initialize variables for reference information
     reference_due_date = None
     reference_total_amount = None
@@ -73,7 +73,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
                         doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount,selected_payabale_from,selected_payabale_to,selected_invoiceNumber)
                         upload_doc(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
                 
-                        excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date,selected_total_amount, selected_payabale_from,selected_payabale_to,selected_invoiceNumber)                                  
+                        excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date,selected_total_amount, selected_payabale_from)                                  
                         header_written=True
                         
 
@@ -105,7 +105,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
             selected_due_date, selected_total_amount=find_first_non_none(dic)
             doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount)
             upload_doc(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
-            excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,selected_payabale_from,selected_payabale_to,selected_invoiceNumber)
+            excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,selected_payabale_from)
             
 
     except Exception as e:

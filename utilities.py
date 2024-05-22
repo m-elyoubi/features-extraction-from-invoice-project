@@ -345,19 +345,21 @@ def find_first_non_none(dic):
 
 # Create a CSV file containing extracted features and upload it to an S3 bucket.  in review!
 def excel_creator(
-    s3_client:BaseClient,
+    s3_client: BaseClient,
     bucket_name: str,
     prefix_splited_doc: str,
     splited_doc_name: str,
-    all_excel_data: list,
+    all_csv_data: list,
     header_written: bool,
     prefix_sheet_creator: str,
     due_date: str,
     total_amount: float,
-    paybale_from: str,
-    paybale_to: str,
-    invoice_number: str
+    paybale_from: str
 ) -> None:
+   
+    # This function is for saving features inside a CSV file.
+    # Todo: the stored features should be a list of extracted features in function extraction_()
+    # Todo: Upload the excel file in the S3 bucket.
     try:
         # Initialize a dictionary to store extracted features information
         extracted_info = {}
@@ -365,43 +367,38 @@ def excel_creator(
         extracted_info["Payable From"] = paybale_from
         extracted_info["Due Date"]     = due_date
         extracted_info["Total Amount"] = total_amount
-        extracted_info["Payable To"]   = paybale_to
-        extracted_info["Invoice Number"]   = invoice_number
-
-        extracted_info["Link to PDF"] = create_preauthenticated_url(s3_client, bucket_name, f"{prefix_splited_doc}/{splited_doc_name}")
         
-        # Convert extracted information to a DataFrame
-        excel_row_data = pd.DataFrame([extracted_info])
+
+        # extracted_info["Link to PDF"] = f'https://{bucket_name}.s3.amazonaws.com/{prefix_splited_doc}/{splited_doc_name}'
+        extracted_info["Link to PDF"] = create_preauthenticated_url(s3_client,bucket_name, f"{prefix_splited_doc}/{splited_doc_name}")
+        # Convert extracted information to a list for the CSV
+        csv_data = list(extracted_info.values())
         
         if not header_written:
             # Write header only if it hasn't been written before
             header = list(extracted_info.keys())
-            all_excel_data.append(header)
+            all_csv_data.append(header)
             header_written = True
 
-        # Append the current row of data to the overall Excel data
-        all_excel_data.append(excel_row_data)
+        # Append the current row of data to the overall CSV data
+        all_csv_data.append(csv_data)
         
-        # Concatenate all data into a single DataFrame
-        excel_data_df = pd.concat(all_excel_data, ignore_index=True)
-        
-        # Create an in-memory buffer to store the Excel file
-        excel_buffer = BytesIO()
-        
-        # Save the DataFrame to the Excel buffer
-        excel_data_df.to_excel(excel_buffer, index=False)
-        
-        # Upload the Excel file to the specified S3 bucket
+        # Save data to a single CSV file
+        csv_buffer = io.StringIO()
+        csv_writer = csv.writer(csv_buffer)
+        csv_writer.writerows(all_csv_data)
+
+        # Upload the CSV file to the specified S3 bucket
         s3_client.put_object(
             Bucket=bucket_name,
             Key=prefix_sheet_creator,
-            Body=excel_buffer.getvalue()
+            Body=csv_buffer.getvalue()
         )
 
     except Exception as e:
         # Handle any exceptions that may occur during the process and print an error message
-        log.error(f"Error creating Excel file and uploading to S3: {str(e)}")
-
+        log.error(f"Error creating CSV file and uploading to S3: {str(e)}")
+        return None
 # Convert a specific page of a PDF document to image content.   Done!!
 def Scannedpage_tobyte(doc_content: bytes, page_number: int) -> bytes:
     

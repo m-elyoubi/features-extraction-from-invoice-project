@@ -12,77 +12,43 @@ def upload_doc(
     prefix_splited_doc: str,
     doc_name: str,
     temp_pdf_name: str
-) -> None:
+    ) -> None:
 
     try:
-        # Create temporary image paths and save images
-        temp_image_paths = [
-            f"/tmp/image_{i}.jpg"
-            for i, np_img in enumerate(np_array)
-        ]
+        # Initialize an empty list to store file paths of temporary images
+        image_paths = []
 
-        for path, np_img in zip(temp_image_paths, np_array):
-            # Convert NumPy array to BGR format
-            cv_img = cv.cvtColor(np_img, cv.COLOR_RGB2BGR)
+        # Loop through each image in the NumPy array
+        for i, np_img in enumerate(np_array):
+            # Convert NumPy image to OpenCV format (BGR)
+            cv_img_temp = cv.cvtColor(np_img, cv.COLOR_RGB2BGR)
 
-            # Encode image as JPEG
-            _, img_bytes = cv.imencode('.jpg', cv_img)
+            # Encode the OpenCV image to JPEG format
+            _, img_bytes = cv.imencode('.jpg', cv_img_temp)
 
-            # Save JPEG to temporary path
-            with open(path, 'wb') as img_file:
-                img_file.write(img_bytes)
+            # Create a temporary file path for the current image
+            temp_img_path = f"/tmp/image_{i}.jpg"
 
-        # Generate PDF from images
-        save_images_to_pdf(temp_image_paths, temp_pdf_name)
+            # Write the image bytes to the temporary file
+            with open(temp_img_path, 'wb') as f:
+                f.write(img_bytes)
 
-        # Define S3 key for the PDF
-        s3_key = f"{prefix_splited_doc}/{doc_name}"
+            # Add the temporary image path to the list
+            image_paths.append(temp_img_path)
 
-        # Upload PDF to S3
+        # Call the save_images_to_pdf function to generate the PDF using the temporary image paths
+        save_images_to_pdf(image_paths, temp_pdf_name)
+
+        # Define the destination key for the PDF in S3
+        doc_output_key = f"{prefix_splited_doc}/{doc_name}"
+
+        # Upload the generated PDF to S3
         with open(temp_pdf_name, 'rb') as pdf_file:
-            s3_client.upload_fileobj(pdf_file, bucket_name, s3_key)
+            s3_client.upload_fileobj(pdf_file, bucket_name, doc_output_key)
 
-        log.info(f"Successfully uploaded PDF to S3: s3://{bucket_name}/{s3_key}")
+        # Print a message indicating successful upload to S3
+        log.info(f"Uploaded PDF to S3: s3://{bucket_name}/{doc_output_key}")
 
     except Exception as e:
-        log.error(f"Failed to save images to PDF and upload to S3: {str(e)}")
-
-# def upload_document(s3_client: BaseClient, np_array: list, bucket_name: str, prefix_splited_doc: str, doc_name: str, temp_pdf_name: str) -> None:
-
-#     try:
-#         # Initialize an empty list to store file paths of temporary images
-#         image_paths = []
-
-#         # Loop through each image in the NumPy array
-#         for i, np_img in enumerate(np_array):
-#             # Convert NumPy image to OpenCV format (BGR)
-#             cv_img_temp = cv.cvtColor(np_img, cv.COLOR_RGB2BGR)
-
-#             # Encode the OpenCV image to JPEG format
-#             _, img_bytes = cv.imencode('.jpg', cv_img_temp)
-
-#             # Create a temporary file path for the current image
-#             temp_img_path = f"/tmp/image_{i}.jpg"
-
-#             # Write the image bytes to the temporary file
-#             with open(temp_img_path, 'wb') as f:
-#                 f.write(img_bytes)
-
-#             # Add the temporary image path to the list
-#             image_paths.append(temp_img_path)
-
-#         # Call the save_images_to_pdf function to generate the PDF using the temporary image paths
-#         images_to_pdf(image_paths, temp_pdf_name)
-
-#         # Define the destination key for the PDF in S3
-#         doc_output_key = f"{prefix_splited_doc}/{doc_name}"
-
-#         # Upload the generated PDF to S3
-#         with open(temp_pdf_name, 'rb') as pdf_file:
-#             s3_client.upload_fileobj(pdf_file, bucket_name, doc_output_key)
-#         # Print a message indicating successful upload to S3
-#         log.info(f"Uploaded PDF to S3: s3://{bucket_name}/{doc_output_key}")
-
-#     except Exception as e:
-#         # Handle any exceptions that may occur during the process and print an error message
-#         log.error(f"Error saving images to PDF and uploading to S3: {str(e)}")
+        # Handle any exceptions that may occur during the process and print an error message
+        log.error(f"Error saving images to PDF and uploading to S3: {str(e)}")
