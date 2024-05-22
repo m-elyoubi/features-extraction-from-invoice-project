@@ -1,5 +1,3 @@
-Certainly! Here is the updated README file with the additional details for configuring the AWS CLI.
-
 ---
 
 # Project Setup and Usage Guide
