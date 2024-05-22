@@ -1,5 +1,3 @@
----
-
 # Project Setup and Usage Guide
 
 ## Prerequisites
