@@ -34,14 +34,16 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
         content_images_list = transformation_document(doc)
         
         # Create this dictionary to save the first due date and corresponding amount that they come at the top of the document
+        # Create this dictionary to save the first due date and corresponding amount that they come at the top of the document
         dic={
-            'due date':[] ,
-            'total amount':[],
-            'payable from':[],
-            'payable to':[],
-            'invoice number':[],
+        'due date':[] ,
+        'total amount':[]
+        }  
+        # 'payable from':[]
+        # 'payable to':[],
+        # 'invoice number':[],
 
-            }
+            
         # Iterate over each image content in the array
         for i, content_image in enumerate(content_images_list, start=1):
             # Decode image content and resize if necessary
@@ -50,7 +52,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
 
             temp_pdf_name = f"/tmp/pdf_{pdf_index}.pdf" #current_payabale_to     
            
-            _,current_due_date_converted, current_total_amount,current_paybale_from, current_paybale_to, current_invoiceNumber  = extraction_features(textract_client,content_image)  # thi will give us the four wanted features from each image
+            _,current_due_date_converted, current_total_amount,current_paybale_from  = extraction_features(textract_client,content_image)  # thi will give us the four wanted features from each image
            
             if reference_total_amount is not None or reference_due_date is not None:
               
@@ -58,7 +60,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
                 # Check if the page is similar to the previous one based on SSIM or extracted information
                 if (current_total_amount == reference_total_amount or current_due_date_converted==reference_due_date):
                     #"Page {i} is similar to the previous page. Adding to the current sequence."
-                    append_features(dic,reference_due_date,reference_total_amount,reference_payabale_from,reference_payabale_to,reference_invoiceNumber)
+                    append_features(dic,reference_due_date,reference_total_amount)
                     similar_pages.append(img_np)
         
                 else:
@@ -66,11 +68,13 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
                     if similar_pages:
                         
                         # add for each splited document with own due date and total amount
-                        append_features(dic,reference_due_date,reference_total_amount,reference_payabale_from,reference_payabale_to,reference_invoiceNumber)
+                        append_features(dic,reference_due_date,reference_total_amount)
                        
-                        selected_due_date, selected_total_amount,selected_payabale_from,selected_payabale_to,selected_invoiceNumber= find_first_non_none(dic)
+                        # selected_due_date, selected_total_amount,selected_payabale_from,selected_payabale_to,selected_invoiceNumber= find_first_non_none(dic)
+                        selected_due_date, selected_total_amount=find_first_non_none(dic)
                         
-                        doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount,selected_payabale_from,selected_payabale_to,selected_invoiceNumber)
+                        # doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount,selected_payabale_from,selected_payabale_to,selected_invoiceNumber)
+                        doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount)
                         upload_doc(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
                 
                         excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date,selected_total_amount, selected_payabale_from)                                  
@@ -80,9 +84,9 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
 
                         dic['due date']=[]
                         dic['total amount']=[]
-                        dic['payable from']=[]
-                        dic['payable to']=[]
-                        dic['invoice number']=[]
+                        # dic['payable from']=[]
+                        # dic['payable to']=[]
+                        # dic['invoice number']=[]
                         
                     
                     pdf_index += 1
@@ -92,11 +96,11 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
                 similar_pages.append(img_np)  
 
             
-            reference_payabale_to = current_paybale_to
+            # reference_payabale_to = current_paybale_to
             reference_due_date= current_due_date_converted
             reference_total_amount = current_total_amount
             reference_payabale_from = current_paybale_from
-            reference_payabale_from = current_invoiceNumber
+            # reference_payabale_from = current_invoiceNumber
 
 
         # Save the last sequence to a new PDF if not empty
@@ -105,7 +109,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
             selected_due_date, selected_total_amount=find_first_non_none(dic)
             doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount)
             upload_doc(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
-            excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,selected_payabale_from)
+            excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_total_amount,reference_payabale_from)
             
 
     except Exception as e:

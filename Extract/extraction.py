@@ -16,21 +16,21 @@ def extraction_features(textract_client: BaseClient, content_image: bytes) -> Tu
             future_payable_from = executor.submit(extract_payable_from, text)
             future_due_date = executor.submit(extract_due_date, text)
             future_total_amount = executor.submit(extract_total_amount, text)
-            future_payable_to = executor.submit(extract_payable_to, text)
-            future_invoice_number = executor.submit(extract_InvoiceNumber, text)
+            # future_payable_to = executor.submit(extract_payable_to, text)
+            # future_invoice_number = executor.submit(extract_InvoiceNumber, text)
 
             # Retrieve results from each future
             payable_from = future_payable_from.result()
             due_date, due_date_converted = future_due_date.result()
             total_amount = future_total_amount.result()
-            payable_to = future_payable_to.result()
-            invoice_number = future_invoice_number.result()
+            # payable_to = future_payable_to.result()
+            # invoice_number = future_invoice_number.result()
 
             # Log the extracted features for debugging purposes
-            logger.info(f'{due_date},{due_date_converted} ,{total_amount} , {payable_from}, {payable_to},{invoice_number}')
+            logger.info(f'{due_date},{due_date_converted} ,{total_amount} , {payable_from}')
     
             # Return the extracted features as a tuple
-            return due_date, due_date_converted, total_amount, payable_from, payable_to, invoice_number
+            return due_date, due_date_converted, total_amount, payable_from  #, payable_to, invoice_number
 
     except Exception as e:
         # Log any exceptions that occur during the extraction process
