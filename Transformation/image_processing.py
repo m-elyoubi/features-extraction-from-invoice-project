@@ -73,7 +73,7 @@ def process_doc(s3_client: BaseClient,textract_client: BaseClient,bucket_name,pr
                         doc_name =name_document_with_convention_naming(selected_due_date, selected_total_amount,selected_payabale_from,selected_payabale_to,selected_invoiceNumber)
                         upload_doc(s3_client,similar_pages, bucket_name, prefix_splited_doc, doc_name, temp_pdf_name)
                 
-                        excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date, selected_payabale_from,selected_payabale_to,selected_invoiceNumber)                                  
+                        excel_creator(s3_client,bucket_name,prefix_splited_doc, doc_name, all_csv_data,header_written, prefix_sheet_creator,selected_due_date,selected_total_amount, selected_payabale_from,selected_payabale_to,selected_invoiceNumber)                                  
                         header_written=True
                         
 
